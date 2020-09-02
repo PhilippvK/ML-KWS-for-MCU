@@ -19,7 +19,7 @@
 #ifndef __KWS_H__
 #define __KWS_H__
 
-#include "mbed.h"
+//#include "mbed.h"
 #include "nn.h"
 #include "mfcc.h"
 
