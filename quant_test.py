@@ -32,6 +32,8 @@ import tensorflow as tf
 import input_data
 import quant_models as models
 
+from six.moves import xrange  # pylint: disable=redefined-builtin
+
 def run_quant_inference(wanted_words, sample_rate, clip_duration_ms,
                            window_size_ms, window_stride_ms, dct_coefficient_count, 
                            model_architecture, model_size_info):
