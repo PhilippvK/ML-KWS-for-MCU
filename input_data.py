@@ -397,6 +397,7 @@ class AudioProcessor(object):
 
   def get_data(self, how_many, offset, model_settings, background_frequency,
                background_volume_range, time_shift, mode, sess):
+    print("get_data(how_many={}, offset={}, model_settings={}, background_frequency={}, background_volume_range={}, time_shift={}, mode={}, sess={})".format(how_many, offset, model_settings, background_frequency, background_volume_range, time_shift, mode, sess))
     """Gather samples from the data set, applying transformations as needed.
 
     When the mode is 'training', a random selection of samples will be returned,
@@ -426,6 +427,7 @@ class AudioProcessor(object):
       sample_count = len(candidates)
     else:
       sample_count = max(0, min(how_many, len(candidates) - offset))
+      print("{} = max(0, min({}, {} - {}))".format(sample_count, how_many, len(candidates), offset))
     # Data and labels will be populated and returned.
     data = np.zeros((sample_count, model_settings['fingerprint_size']))
     labels = np.zeros((sample_count, model_settings['label_count']))
