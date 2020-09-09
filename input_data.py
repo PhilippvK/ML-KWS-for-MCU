@@ -486,6 +486,8 @@ class AudioProcessor(object):
       data[i - offset, :] = sess.run(self.mfcc_, feed_dict=input_dict).flatten()
       label_index = self.word_to_index[sample['label']]
       labels[i - offset, label_index] = 1
+      print("i={} input_dict={}".format(i, input_dict))
+    print("data={} labels={}".format(data, labels))
     return data, labels
 
   def get_wav_files(self, how_many, offset, model_settings, mode):
