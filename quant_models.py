@@ -131,7 +131,7 @@ def load_variables_from_checkpoint(sess, start_checkpoint):
     sess: TensorFlow session.
     start_checkpoint: Path to saved checkpoint on disk.
   """
-  saver = tf.train.Saver(tf.global_variables())
+  saver = tf.compat.v1.train.Saver(tf.compat.v1.global_variables())
   saver.restore(sess, start_checkpoint)
 
 
@@ -144,7 +144,7 @@ def create_dnn_model(fingerprint_input, model_settings, model_size_info,
   """
 
   if is_training:
-    dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
+    dropout_prob = tf.compat.v1.placeholder(tf.float32, name='dropout_prob')
   fingerprint_size = model_settings['fingerprint_size']
   label_count = model_settings['label_count']
   num_layers = len(model_size_info)
@@ -152,27 +152,27 @@ def create_dnn_model(fingerprint_input, model_settings, model_size_info,
   layer_dim.extend(model_size_info)
   flow = fingerprint_input
   if(act_max[0]!=0):
-    flow = tf.fake_quant_with_min_max_vars(flow, min=-act_max[0], \
+    flow = tf.quantization.fake_quant_with_min_max_vars(flow, min=-act_max[0], \
                max=act_max[0]-(act_max[0]/128.0), num_bits=8)
   for i in range(1, num_layers + 1):
-      with tf.variable_scope('fc'+str(i)):
-          W = tf.get_variable('W', shape=[layer_dim[i-1], layer_dim[i]], 
-                initializer=tf.contrib.layers.xavier_initializer())
-          b = tf.get_variable('b', shape=[layer_dim[i]])
+      with tf.compat.v1.variable_scope('fc'+str(i)):
+          W = tf.compat.v1.get_variable('W', shape=[layer_dim[i-1], layer_dim[i]], 
+                initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"))
+          b = tf.compat.v1.get_variable('b', shape=[layer_dim[i]])
           flow = tf.matmul(flow, W) + b
           if(act_max[i]!=0):
-            flow = tf.fake_quant_with_min_max_vars(flow, min=-act_max[i], \
+            flow = tf.quantization.fake_quant_with_min_max_vars(flow, min=-act_max[i], \
                        max=act_max[i]-(act_max[i]/128.0), num_bits=8)
           flow = tf.nn.relu(flow)
           if is_training:
-            flow = tf.nn.dropout(flow, dropout_prob)
+            flow = tf.nn.dropout(flow, 1 - (dropout_prob))
 
-  weights = tf.get_variable('final_fc', shape=[layer_dim[-1], label_count], 
-              initializer=tf.contrib.layers.xavier_initializer())
+  weights = tf.compat.v1.get_variable('final_fc', shape=[layer_dim[-1], label_count], 
+              initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"))
   bias = tf.Variable(tf.zeros([label_count]))
   logits = tf.matmul(flow, weights) + bias
   if(act_max[num_layers+1]!=0):
-    logits = tf.fake_quant_with_min_max_vars(logits, min=-act_max[num_layers+1], \
+    logits = tf.quantization.fake_quant_with_min_max_vars(logits, min=-act_max[num_layers+1], \
                  max=act_max[num_layers+1]-(act_max[num_layers+1]/128.0), num_bits=8)
   if is_training:
     return logits, dropout_prob
@@ -203,7 +203,7 @@ def create_ds_cnn_model(fingerprint_input, model_settings, model_size_info,
         [slim.convolution2d, slim.separable_convolution2d],
         weights_initializer=slim.initializers.xavier_initializer(),
         biases_initializer=slim.init_ops.zeros_initializer(),
-        weights_regularizer=slim.l2_regularizer(weight_decay)) as sc:
+        weights_regularizer=tf.keras.regularizers.l2(0.5 * (weight_decay))) as sc:
       return sc
 
   def _depthwise_separable_conv(inputs,
@@ -223,9 +223,9 @@ def create_ds_cnn_model(fingerprint_input, model_settings, model_size_info,
                                                   depth_multiplier=1,
                                                   kernel_size=kernel_size,
                                                   scope=sc+'/dw_conv',
-                                                  reuse=tf.AUTO_REUSE)
+                                                  reuse=tf.compat.v1.AUTO_REUSE)
     if(act_max[2*layer_no]>0):
-      depthwise_conv = tf.fake_quant_with_min_max_vars(depthwise_conv, 
+      depthwise_conv = tf.quantization.fake_quant_with_min_max_vars(depthwise_conv, 
           min=-act_max[2*layer_no], 
           max=act_max[2*layer_no]-(act_max[2*layer_no]/128.0), 
           num_bits=8, name='quant_ds_conv'+str(layer_no))
@@ -237,9 +237,9 @@ def create_ds_cnn_model(fingerprint_input, model_settings, model_size_info,
                                         num_pwc_filters,
                                         kernel_size=[1, 1],
                                         scope=sc+'/pw_conv',
-                                        reuse=tf.AUTO_REUSE)
+                                        reuse=tf.compat.v1.AUTO_REUSE)
     if(act_max[2*layer_no+1]>0):
-      pointwise_conv = tf.fake_quant_with_min_max_vars(pointwise_conv, 
+      pointwise_conv = tf.quantization.fake_quant_with_min_max_vars(pointwise_conv, 
           min=-act_max[2*layer_no+1], 
           max=act_max[2*layer_no+1]-(act_max[2*layer_no+1]/128.0), 
           num_bits=8, name='quant_pw_conv'+str(layer_no+1))
@@ -250,7 +250,7 @@ def create_ds_cnn_model(fingerprint_input, model_settings, model_size_info,
     return bn
 
   if is_training:
-    dropout_prob = tf.placeholder(tf.float32, name='dropout_prob')
+    dropout_prob = tf.compat.v1.placeholder(tf.float32, name='dropout_prob')
 
   label_count = model_settings['label_count']
   input_frequency_size = model_settings['dct_coefficient_count']
@@ -282,7 +282,7 @@ def create_ds_cnn_model(fingerprint_input, model_settings, model_size_info,
     i += 1
 
   scope = 'DS-CNN'
-  with tf.variable_scope(scope) as sc:
+  with tf.compat.v1.variable_scope(scope) as sc:
     end_points_collection = sc.name + '_end_points'
     with slim.arg_scope([slim.convolution2d, slim.separable_convolution2d],
                         activation_fn=None,
@@ -295,16 +295,16 @@ def create_ds_cnn_model(fingerprint_input, model_settings, model_size_info,
                           updates_collections=None,
                           activation_fn=tf.nn.relu):
         if act_max[0]>0:
-          fingerprint_4d = tf.fake_quant_with_min_max_vars(fingerprint_4d, 
+          fingerprint_4d = tf.quantization.fake_quant_with_min_max_vars(fingerprint_4d, 
               min=-act_max[0], max=act_max[0]-(act_max[0]/128.0), 
               num_bits=8, name='quant_input')
         for layer_no in range(0,num_layers):
           if layer_no==0:
             net = slim.convolution2d(fingerprint_4d, conv_feat[layer_no],\
                 [conv_kt[layer_no], conv_kf[layer_no]], stride=[conv_st[layer_no], 
-                 conv_sf[layer_no]], padding='SAME', scope='conv_1', reuse=tf.AUTO_REUSE)
+                 conv_sf[layer_no]], padding='SAME', scope='conv_1', reuse=tf.compat.v1.AUTO_REUSE)
             if act_max[1]>0:
-              net = tf.fake_quant_with_min_max_vars(net, min=-act_max[1], 
+              net = tf.quantization.fake_quant_with_min_max_vars(net, min=-act_max[1], 
                   max=act_max[1]-(act_max[1]/128.0), num_bits=8, name='quant_conv1')
             net = tf.nn.relu(net)
             #net = slim.batch_norm(net, scope='conv_1/batch_norm')
@@ -320,15 +320,15 @@ def create_ds_cnn_model(fingerprint_input, model_settings, model_size_info,
 
         net = slim.avg_pool2d(net, [t_dim, f_dim], scope='avg_pool')
         if act_max[2*num_layers]>0:
-          net = tf.fake_quant_with_min_max_vars(net, min=-act_max[2*num_layers], 
+          net = tf.quantization.fake_quant_with_min_max_vars(net, min=-act_max[2*num_layers], 
                     max=act_max[2*num_layers]-(act_max[2*num_layers]/128.0), 
                     num_bits=8, name='quant_pool')
 
     net = tf.squeeze(net, [1, 2], name='SpatialSqueeze')
     logits = slim.fully_connected(net, label_count, activation_fn=None, 
-                 scope='fc1', reuse=tf.AUTO_REUSE)
+                 scope='fc1', reuse=tf.compat.v1.AUTO_REUSE)
     if act_max[2*num_layers+1]>0:
-      logits = tf.fake_quant_with_min_max_vars(logits, min=-act_max[2*num_layers+1], 
+      logits = tf.quantization.fake_quant_with_min_max_vars(logits, min=-act_max[2*num_layers+1], 
                    max=act_max[2*num_layers+1]-(act_max[2*num_layers+1]/128.0), 
                    num_bits=8, name='quant_fc')
 

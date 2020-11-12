@@ -34,8 +34,8 @@ import models
 
 def load_graph(filename):
   """Unpersists graph from file as default graph."""
-  with tf.gfile.FastGFile(filename, 'rb') as f:
-    graph_def = tf.GraphDef()
+  with tf.compat.v1.gfile.FastGFile(filename, 'rb') as f:
+    graph_def = tf.compat.v1.GraphDef()
     graph_def.ParseFromString(f.read())
     tf.import_graph_def(graph_def, name='')
 
@@ -58,8 +58,8 @@ def run_inference_pb(wanted_words, sample_rate, clip_duration_ms,
     model_size_info: Model dimensions : different lengths for different models
   """
   
-  tf.logging.set_verbosity(tf.logging.INFO)
-  sess = tf.InteractiveSession()
+  tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
+  sess = tf.compat.v1.InteractiveSession()
   words_list = input_data.prepare_words_list(wanted_words.split(','))
   model_settings = models.prepare_model_settings(
       len(words_list), sample_rate, clip_duration_ms, window_size_ms,
@@ -77,20 +77,20 @@ def run_inference_pb(wanted_words, sample_rate, clip_duration_ms,
 
   label_count = model_settings['label_count']
 
-  ground_truth_input = tf.placeholder(
+  ground_truth_input = tf.compat.v1.placeholder(
       tf.float32, [None, label_count], name='groundtruth_input')
 
-  predicted_indices = tf.argmax(softmax, 1)
-  expected_indices = tf.argmax(ground_truth_input, 1)
+  predicted_indices = tf.argmax(input=softmax, axis=1)
+  expected_indices = tf.argmax(input=ground_truth_input, axis=1)
   correct_prediction = tf.equal(predicted_indices, expected_indices)
-  confusion_matrix = tf.confusion_matrix(
-      expected_indices, predicted_indices, num_classes=label_count)
-  evaluation_step = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+  confusion_matrix = tf.math.confusion_matrix(
+      labels=expected_indices, predictions=predicted_indices, num_classes=label_count)
+  evaluation_step = tf.reduce_mean(input_tensor=tf.cast(correct_prediction, tf.float32))
 
   if(FLAGS.training):
     # training set
     set_size = audio_processor.set_size('training')
-    tf.logging.info('Training set size:%d', set_size)
+    tf.compat.v1.logging.info('Training set size:%d', set_size)
     total_accuracy = 0
     total_conf_matrix = None
     for i in range(0, set_size):
@@ -109,13 +109,13 @@ def run_inference_pb(wanted_words, sample_rate, clip_duration_ms,
         total_conf_matrix = conf_matrix
       else:
         total_conf_matrix += conf_matrix
-    tf.logging.info('Confusion Matrix:\n %s' % (total_conf_matrix))
-    tf.logging.info('Training accuracy = %.2f%% (N=%d)' % (total_accuracy * 100,
+    tf.compat.v1.logging.info('Confusion Matrix:\n %s' % (total_conf_matrix))
+    tf.compat.v1.logging.info('Training accuracy = %.2f%% (N=%d)' % (total_accuracy * 100,
                                                              set_size))
 
   # validation set
   set_size = audio_processor.set_size('validation')
-  tf.logging.info('Validation set size:%d', set_size)
+  tf.compat.v1.logging.info('Validation set size:%d', set_size)
   total_accuracy = 0
   total_conf_matrix = None
   for i in range(0, set_size):
@@ -134,12 +134,12 @@ def run_inference_pb(wanted_words, sample_rate, clip_duration_ms,
       total_conf_matrix = conf_matrix
     else:
       total_conf_matrix += conf_matrix
-  tf.logging.info('Confusion Matrix:\n %s' % (total_conf_matrix))
-  tf.logging.info('Validation accuracy = %.2f%% (N=%d)' %
+  tf.compat.v1.logging.info('Confusion Matrix:\n %s' % (total_conf_matrix))
+  tf.compat.v1.logging.info('Validation accuracy = %.2f%% (N=%d)' %
                   (total_accuracy * 100, set_size))
   # test set
   set_size = audio_processor.set_size('testing')
-  tf.logging.info('Test set size:%d', set_size)
+  tf.compat.v1.logging.info('Test set size:%d', set_size)
   total_accuracy = 0
   total_conf_matrix = None
   for i in range(0, set_size):
@@ -158,8 +158,8 @@ def run_inference_pb(wanted_words, sample_rate, clip_duration_ms,
       total_conf_matrix = conf_matrix
     else:
       total_conf_matrix += conf_matrix
-  tf.logging.info('Confusion Matrix:\n %s' % (total_conf_matrix))
-  tf.logging.info('Test accuracy = %.2f%% (N=%d)' % (total_accuracy * 100,
+  tf.compat.v1.logging.info('Confusion Matrix:\n %s' % (total_conf_matrix))
+  tf.compat.v1.logging.info('Test accuracy = %.2f%% (N=%d)' % (total_accuracy * 100,
                                                            set_size))
 
 def main(_):
@@ -266,4 +266,4 @@ if __name__ == '__main__':
       help='run on training (1) or not (0)',)
 
   FLAGS, unparsed = parser.parse_known_args()
-  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+  tf.compat.v1.app.run(main=main, argv=[sys.argv[0]] + unparsed)
